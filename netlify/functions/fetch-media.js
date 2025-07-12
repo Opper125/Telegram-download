@@ -1,7 +1,7 @@
 const axios = require('axios');
 
 exports.handler = async (event, context) => {
-    const botToken = '7618660728:AAF0gDnzq3tR5SOvCQlCowZlyzoBLE_bQVY';
+    const botToken = process.env.7618660728:AAF0gDnzq3tR5SOvCQlCowZlyzoBLE_bQVY;
     const channelLink = event.queryStringParameters.channel;
 
     if (!channelLink || !channelLink.includes('t.me/')) {
@@ -35,20 +35,31 @@ exports.handler = async (event, context) => {
             if (update.message) {
                 if (update.message.photo) {
                     const photo = update.message.photo[update.message.photo.length - 1]; // Highest quality
-                    mediaItems.push({ type: 'photo', file_id: photo.file_id });
+                    mediaItems.push({ type: 'photo', file_id: photo.file_id, name: `photo_${photo.file_id}.jpg` });
                 }
                 if (update.message.video) {
                     mediaItems.push({
                         type: 'video',
                         file_id: update.message.video.file_id,
-                        thumbnail: update.message.video.thumb?.file_id
+                        thumbnail: update.message.video.thumb?.file_id,
+                        name: `video_${update.message.video.file_id}.mp4`
                     });
+                }
+                if (update.message.audio) {
+                    mediaItems.push({
+                        type: 'audio',
+                        file_id: update.message.audio.file_id,
+                        name: update.message.audio.file_name || `audio_${update.message.audio.file_id}.mp3`
+                    });
+                }
+                if (update.message.text) {
+                    mediaItems.push({ type: 'text', text: update.message.text });
                 }
             }
         });
 
         // Fetch file URLs
-        for (const item of mediaItems) {
+        for (const item of mediaItems.filter(item => item.type !== 'text')) {
             const fileResponse = await axios.get(`https://api.telegram.org/bot${botToken}/getFile?file_id=${item.file_id}`);
             if (fileResponse.data.ok) {
                 item.url = `https://api.telegram.org/file/bot${botToken}/${fileResponse.data.result.file_path}`;
@@ -63,6 +74,11 @@ exports.handler = async (event, context) => {
 
         return {
             statusCode: 200,
+            headers: {
+                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Methods': 'GET, POST',
+                'Access-Control-Allow-Headers': 'Content-Type'
+            },
             body: JSON.stringify({ success: true, media: mediaItems })
         };
     } catch (error) {
