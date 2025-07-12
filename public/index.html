@@ -65,6 +65,45 @@
             background: #0083b0;
         }
 
+        .chat-section {
+            margin-bottom: 30px;
+            width: 100%;
+            max-width: 600px;
+        }
+
+        #chatInput {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 25px;
+            font-size: 1em;
+            outline: none;
+            margin-bottom: 10px;
+        }
+
+        #chatMessages {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 15px;
+            border-radius: 10px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .chat-message {
+            padding: 10px;
+            margin-bottom: 10px;
+            border-radius: 5px;
+        }
+
+        .chat-message.user {
+            background: #00b4db;
+            text-align: right;
+        }
+
+        .chat-message.bot {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
         .media-grid {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
@@ -88,6 +127,11 @@
             width: 100%;
             height: 200px;
             object-fit: cover;
+        }
+
+        .media-item .text-content {
+            padding: 10px;
+            white-space: pre-wrap;
         }
 
         .download-btn {
@@ -168,6 +212,12 @@
             <input type="text" id="channelLink" placeholder="Enter Telegram Channel Link (e.g., https://t.me/channelname)">
             <button id="searchBtn">Search</button>
         </div>
+        <div class="chat-section">
+            <h2>Chat with @Getdownloadvideo_bot</h2>
+            <div id="chatMessages"></div>
+            <input type="text" id="chatInput" placeholder="Type a message to the bot">
+            <button id="sendChatBtn">Send</button>
+        </div>
         <div id="loader" class="loader"></div>
         <div id="mediaGrid" class="media-grid"></div>
         <div class="history-section">
@@ -182,6 +232,9 @@
         const mediaGrid = document.getElementById('mediaGrid');
         const historyList = document.getElementById('historyList');
         const loader = document.getElementById('loader');
+        const chatInput = document.getElementById('chatInput');
+        const sendChatBtn = document.getElementById('sendChatBtn');
+        const chatMessages = document.getElementById('chatMessages');
 
         // Initialize download history
         const downloadHistory = JSON.parse(localStorage.getItem('downloadHistory')) || [];
@@ -231,12 +284,21 @@
                     if (item.type === 'video') {
                         mediaItem.innerHTML = `
                             <video src="${item.thumbnail || item.url}" controls></video>
-                            <button class="download-btn" data-url="${item.url}">Download</button>
+                            <button class="download-btn" data-url="${item.url}" data-name="${item.name}">Download</button>
                         `;
-                    } else {
+                    } else if (item.type === 'photo') {
                         mediaItem.innerHTML = `
                             <img src="${item.url}" alt="Media">
-                            <button class="download-btn" data-url="${item.url}">Download</button>
+                            <button class="download-btn" data-url="${item.url}" data-name="${item.name}">Download</button>
+                        `;
+                    } else if (item.type === 'audio') {
+                        mediaItem.innerHTML = `
+                            <audio src="${item.url}" controls></audio>
+                            <button class="download-btn" data-url="${item.url}" data-name="${item.name}">Download</button>
+                        `;
+                    } else if (item.type === 'text') {
+                        mediaItem.innerHTML = `
+                            <div class="text-content">${item.text}</div>
                         `;
                     }
 
@@ -246,7 +308,7 @@
                 document.querySelectorAll('.download-btn').forEach(btn => {
                     btn.addEventListener('click', async () => {
                         const url = btn.getAttribute('data-url');
-                        const name = url.split('/').pop();
+                        const name = btn.getAttribute('data-name');
                         btn.disabled = true;
                         btn.textContent = 'Downloading...';
 
@@ -283,12 +345,62 @@
             }
         }
 
+        async function sendChatMessage(message) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'chat-message user';
+            messageDiv.textContent = message;
+            chatMessages.appendChild(messageDiv);
+
+            try {
+                const response = await fetch(`https://telegram-video-download.netlify.app/.netlify/functions/chat-bot`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message })
+                });
+                const data = await response.json();
+
+                const botMessageDiv = document.createElement('div');
+                botMessageDiv.className = 'chat-message bot';
+                botMessageDiv.textContent = data.reply || 'Bot response error';
+                chatMessages.appendChild(botMessageDiv);
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+            } catch (error) {
+                console.error('Chat error:', error);
+                const botMessageDiv = document.createElement('div');
+                botMessageDiv.className = 'chat-message bot';
+                botMessageDiv.textContent = 'Error communicating with bot';
+                chatMessages.appendChild(botMessageDiv);
+            }
+        }
+
         searchBtn.addEventListener('click', () => {
             const channelLink = channelLinkInput.value.trim();
             if (channelLink) {
                 fetchMedia(channelLink);
             } else {
                 alert('Please enter a Telegram Channel link!');
+            }
+        });
+
+        sendChatBtn.addEventListener('click', () => {
+            const message = chatInput.value.trim();
+            if (message) {
+                sendChatMessage(message);
+                chatInput.value = '';
+            } else {
+                alert('Please enter a message to send to the bot!');
+            }
+        });
+
+        chatInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                const message = chatInput.value.trim();
+                if (message) {
+                    sendChatMessage(message);
+                    chatInput.value = '';
+                } else {
+                    alert('Please enter a message to send to the bot!');
+                }
             }
         });
 
