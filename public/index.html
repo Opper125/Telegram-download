@@ -123,7 +123,7 @@
             transform: scale(1.05);
         }
 
-        .media-item img, .media-item video {
+        .media-item img, .media-item video, .media-item audio {
             width: 100%;
             height: 200px;
             object-fit: cover;
@@ -345,7 +345,7 @@
             }
         }
 
-        async function sendChatMessage(message) {
+        async function sendChatMessage(message, chatId) {
             const messageDiv = document.createElement('div');
             messageDiv.className = 'chat-message user';
             messageDiv.textContent = message;
@@ -355,7 +355,7 @@
                 const response = await fetch(`https://telegram-video-download.netlify.app/.netlify/functions/chat-bot`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ message })
+                    body: JSON.stringify({ message, chatId })
                 });
                 const data = await response.json();
 
@@ -373,6 +373,25 @@
             }
         }
 
+        // Polling for new messages from Telegram
+        async function pollMessages() {
+            try {
+                const response = await fetch(`https://telegram-video-download.netlify.app/.netlify/functions/chat-bot?poll=true`);
+                const data = await response.json();
+                if (data.messages && data.messages.length > 0) {
+                    data.messages.forEach(msg => {
+                        const botMessageDiv = document.createElement('div');
+                        botMessageDiv.className = 'chat-message bot';
+                        botMessageDiv.textContent = msg.text;
+                        chatMessages.appendChild(botMessageDiv);
+                        chatMessages.scrollTop = chatMessages.scrollHeight;
+                    });
+                }
+            } catch (error) {
+                console.error('Polling error:', error);
+            }
+        }
+
         searchBtn.addEventListener('click', () => {
             const channelLink = channelLinkInput.value.trim();
             if (channelLink) {
@@ -384,25 +403,32 @@
 
         sendChatBtn.addEventListener('click', () => {
             const message = chatInput.value.trim();
-            if (message) {
-                sendChatMessage(message);
+            const chatId = localStorage.getItem('chatId') || prompt('Please enter your Telegram Chat ID:');
+            if (message && chatId) {
+                localStorage.setItem('chatId', chatId);
+                sendChatMessage(message, chatId);
                 chatInput.value = '';
             } else {
-                alert('Please enter a message to send to the bot!');
+                alert('Please enter a message and a valid Chat ID!');
             }
         });
 
         chatInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
                 const message = chatInput.value.trim();
-                if (message) {
-                    sendChatMessage(message);
+                const chatId = localStorage.getItem('chatId') || prompt('Please enter your Telegram Chat ID:');
+                if (message && chatId) {
+                    localStorage.setItem('chatId', chatId);
+                    sendChatMessage(message, chatId);
                     chatInput.value = '';
                 } else {
-                    alert('Please enter a message to send to the bot!');
+                    alert('Please enter a message and a valid Chat ID!');
                 }
             }
         });
+
+        // Start polling for messages
+        setInterval(pollMessages, 5000); // Poll every 5 seconds
 
         // Initialize history on page load
         initHistory();
