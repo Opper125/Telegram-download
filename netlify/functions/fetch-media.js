@@ -1,7 +1,7 @@
 const axios = require('axios');
 
 exports.handler = async (event, context) => {
-    const botToken = process.env.7618660728:AAGq-N1Y56LoBjIgQy3Y98n8XxHLFlB7Zds;
+    const botToken = process.env.TELEGRAM_BOT_TOKEN;
     const channelLink = event.queryStringParameters.channel;
 
     if (!channelLink || !channelLink.includes('t.me/')) {
@@ -12,12 +12,12 @@ exports.handler = async (event, context) => {
     }
 
     try {
-        const channelName = channelLink.split('t.me/')[1];
+        const channelName = channelLink.split('t.me/')[1].split('?')[0]; // Handle query parameters
         const chatResponse = await axios.get(`https://api.telegram.org/bot${botToken}/getChat?chat_id=@${channelName}`);
         if (!chatResponse.data.ok) {
             return {
                 statusCode: 400,
-                body: JSON.stringify({ success: false, error: 'Error fetching channel data' })
+                body: JSON.stringify({ success: false, error: `Error fetching channel data: ${chatResponse.data.description}` })
             };
         }
 
@@ -26,7 +26,7 @@ exports.handler = async (event, context) => {
         if (!updatesResponse.data.ok) {
             return {
                 statusCode: 400,
-                body: JSON.stringify({ success: false, error: 'Error fetching messages' })
+                body: JSON.stringify({ success: false, error: `Error fetching messages: ${updatesResponse.data.description}` })
             };
         }
 
@@ -52,13 +52,19 @@ exports.handler = async (event, context) => {
                         name: update.message.audio.file_name || `audio_${update.message.audio.file_id}.mp3`
                     });
                 }
+                if (update.message.document) {
+                    mediaItems.push({
+                        type: 'document',
+                        file_id: update.message.document.file_id,
+                        name: update.message.document.file_name || `document_${update.message.document.file_id}`
+                    });
+                }
                 if (update.message.text) {
                     mediaItems.push({ type: 'text', text: update.message.text });
                 }
             }
         });
 
-        // Fetch file URLs
         for (const item of mediaItems.filter(item => item.type !== 'text')) {
             const fileResponse = await axios.get(`https://api.telegram.org/bot${botToken}/getFile?file_id=${item.file_id}`);
             if (fileResponse.data.ok) {
@@ -82,10 +88,15 @@ exports.handler = async (event, context) => {
             body: JSON.stringify({ success: true, media: mediaItems })
         };
     } catch (error) {
-        console.error('Error:', error);
+        console.error('Error:', error.message);
         return {
             statusCode: 500,
-            body: JSON.stringify({ success: false, error: 'Server error' })
+            headers: {
+                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Methods': 'GET, POST',
+                'Access-Control-Allow-Headers': 'Content-Type'
+            },
+            body: JSON.stringify({ success: false, error: `Server error: ${error.message}` })
         };
     }
 };
