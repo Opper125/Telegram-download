@@ -1,7 +1,7 @@
 const axios = require('axios');
 
 exports.handler = async (event, context) => {
-    const botToken = process.env.7618660728:AAF0gDnzq3tR5SOvCQlCowZlyzoBLE_bQVY;
+    const botToken = process.env.7618660728:AAGq-N1Y56LoBjIgQy3Y98n8XxHLFlB7Zds;
     const channelLink = event.queryStringParameters.channel;
 
     if (!channelLink || !channelLink.includes('t.me/')) {
