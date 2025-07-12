@@ -2,11 +2,10 @@ const axios = require('axios');
 
 exports.handler = async (event, context) => {
     const botToken = process.env.TELEGRAM_BOT_TOKEN;
-    const defaultChatId = '1538232799'; // Hardcoded Chat ID
+    const defaultChatId = '1538232799';
 
     try {
         if (event.queryStringParameters && event.queryStringParameters.poll) {
-            // Polling mode: Fetch new messages from Telegram
             const updatesResponse = await axios.get(`https://api.telegram.org/bot${botToken}/getUpdates`);
             if (!updatesResponse.data.ok) {
                 return {
@@ -22,12 +21,23 @@ exports.handler = async (event, context) => {
 
             const messages = updatesResponse.data.result
                 .filter(update => update.message && update.message.chat.id.toString() === defaultChatId)
-                .map(update => ({
-                    chatId: update.message.chat.id.toString(),
-                    text: update.message.text || 'No text'
-                }));
+                .map(update => {
+                    const msg = { chatId: update.message.chat.id.toString() };
+                    if (update.message.text) {
+                        msg.text = update.message.text;
+                    }
+                    if (update.message.photo) {
+                        msg.photo = `https://api.telegram.org/file/bot${botToken}/${update.message.photo[update.message.photo.length - 1].file_path}`;
+                    }
+                    if (update.message.video) {
+                        msg.video = `https://api.telegram.org/file/bot${botToken}/${update.message.video.file_path}`;
+                    }
+                    if (update.message.voice) {
+                        msg.voice = `https://api.telegram.org/file/bot${botToken}/${update.message.voice.file_path}`;
+                    }
+                    return msg;
+                });
 
-            // Clear processed updates
             if (updatesResponse.data.result.length > 0) {
                 const lastUpdateId = updatesResponse.data.result[updatesResponse.data.result.length - 1].update_id;
                 await axios.get(`https://api.telegram.org/bot${botToken}/getUpdates?offset=${lastUpdateId + 1}`);
@@ -43,7 +53,6 @@ exports.handler = async (event, context) => {
                 body: JSON.stringify({ messages })
             };
         } else {
-            // Handle incoming messages from website
             const { message, chatId = defaultChatId } = JSON.parse(event.body || '{}');
 
             if (!message) {
@@ -58,7 +67,6 @@ exports.handler = async (event, context) => {
                 };
             }
 
-            // Send message to Telegram
             const response = await axios.post(`https://api.telegram.org/bot${botToken}/sendMessage`, {
                 chat_id: chatId,
                 text: message
@@ -76,9 +84,6 @@ exports.handler = async (event, context) => {
                 };
             }
 
-            // Send confirmation reply
-            const botReply = `Message sent: ${message}`;
-
             return {
                 statusCode: 200,
                 headers: {
@@ -86,7 +91,7 @@ exports.handler = async (event, context) => {
                     'Access-Control-Allow-Methods': 'POST',
                     'Access-Control-Allow-Headers': 'Content-Type'
                 },
-                body: JSON.stringify({ reply: botReply })
+                body: JSON.stringify({ reply: `Message sent: ${message}` })
             };
         }
     } catch (error) {
