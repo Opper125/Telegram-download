@@ -1,7 +1,8 @@
 const axios = require('axios');
 
 exports.handler = async (event, context) => {
-    const botToken = process.env.7618660728:AAGq-N1Y56LoBjIgQy3Y98n8XxHLFlB7Zds;
+    const botToken = process.env.TELEGRAM_BOT_TOKEN;
+    const defaultChatId = '1538232799'; // Hardcoded Chat ID
 
     try {
         if (event.queryStringParameters && event.queryStringParameters.poll) {
@@ -10,17 +11,24 @@ exports.handler = async (event, context) => {
             if (!updatesResponse.data.ok) {
                 return {
                     statusCode: 400,
-                    body: JSON.stringify({ messages: [], error: 'Error fetching updates' })
+                    headers: {
+                        'Access-Control-Allow-Origin': '*',
+                        'Access-Control-Allow-Methods': 'GET, POST',
+                        'Access-Control-Allow-Headers': 'Content-Type'
+                    },
+                    body: JSON.stringify({ messages: [], error: `Error fetching updates: ${updatesResponse.data.description}` })
                 };
             }
 
-            const messages = updatesResponse.data.result.map(update => ({
-                chatId: update.message?.chat.id.toString(),
-                text: update.message?.text || 'No text'
-            }));
+            const messages = updatesResponse.data.result
+                .filter(update => update.message && update.message.chat.id.toString() === defaultChatId)
+                .map(update => ({
+                    chatId: update.message.chat.id.toString(),
+                    text: update.message.text || 'No text'
+                }));
 
             // Clear processed updates
-            if (messages.length > 0) {
+            if (updatesResponse.data.result.length > 0) {
                 const lastUpdateId = updatesResponse.data.result[updatesResponse.data.result.length - 1].update_id;
                 await axios.get(`https://api.telegram.org/bot${botToken}/getUpdates?offset=${lastUpdateId + 1}`);
             }
@@ -35,13 +43,18 @@ exports.handler = async (event, context) => {
                 body: JSON.stringify({ messages })
             };
         } else {
-            // Webhook mode: Handle incoming messages from website
-            const { message, chatId } = JSON.parse(event.body);
+            // Handle incoming messages from website
+            const { message, chatId = defaultChatId } = JSON.parse(event.body || '{}');
 
-            if (!message || !chatId) {
+            if (!message) {
                 return {
                     statusCode: 400,
-                    body: JSON.stringify({ reply: 'No message or chatId provided' })
+                    headers: {
+                        'Access-Control-Allow-Origin': '*',
+                        'Access-Control-Allow-Methods': 'POST',
+                        'Access-Control-Allow-Headers': 'Content-Type'
+                    },
+                    body: JSON.stringify({ reply: 'No message provided' })
                 };
             }
 
@@ -54,12 +67,17 @@ exports.handler = async (event, context) => {
             if (!response.data.ok) {
                 return {
                     statusCode: 400,
-                    body: JSON.stringify({ reply: 'Error sending message to bot' })
+                    headers: {
+                        'Access-Control-Allow-Origin': '*',
+                        'Access-Control-Allow-Methods': 'POST',
+                        'Access-Control-Allow-Headers': 'Content-Type'
+                    },
+                    body: JSON.stringify({ reply: `Error sending message: ${response.data.description}` })
                 };
             }
 
-            // Simulate bot response (replace with actual bot logic if needed)
-            const botReply = `Bot received: ${message}`;
+            // Send confirmation reply
+            const botReply = `Message sent: ${message}`;
 
             return {
                 statusCode: 200,
@@ -72,10 +90,15 @@ exports.handler = async (event, context) => {
             };
         }
     } catch (error) {
-        console.error('Error:', error);
+        console.error('Error:', error.message);
         return {
             statusCode: 500,
-            body: JSON.stringify({ reply: 'Server error' })
+            headers: {
+                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Methods': 'GET, POST',
+                'Access-Control-Allow-Headers': 'Content-Type'
+            },
+            body: JSON.stringify({ reply: `Server error: ${error.message}` })
         };
     }
 };
