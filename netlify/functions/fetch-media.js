@@ -7,17 +7,27 @@ exports.handler = async (event, context) => {
     if (!channelLink || !channelLink.includes('t.me/')) {
         return {
             statusCode: 400,
-            body: JSON.stringify({ success: false, error: 'Invalid Telegram Channel link' })
+            headers: {
+                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Methods': 'GET, POST',
+                'Access-Control-Allow-Headers': 'Content-Type'
+            },
+            body: JSON.stringify({ success: false, error: 'Invalid Telegram Channel/Group link' })
         };
     }
 
     try {
-        const channelName = channelLink.split('t.me/')[1].split('?')[0]; // Handle query parameters
+        const channelName = channelLink.split('t.me/')[1].split('?')[0];
         const chatResponse = await axios.get(`https://api.telegram.org/bot${botToken}/getChat?chat_id=@${channelName}`);
         if (!chatResponse.data.ok) {
             return {
                 statusCode: 400,
-                body: JSON.stringify({ success: false, error: `Error fetching channel data: ${chatResponse.data.description}` })
+                headers: {
+                    'Access-Control-Allow-Origin': '*',
+                    'Access-Control-Allow-Methods': 'GET, POST',
+                    'Access-Control-Allow-Headers': 'Content-Type'
+                },
+                body: JSON.stringify({ success: false, error: `Error fetching chat data: ${chatResponse.data.description}` })
             };
         }
 
@@ -26,6 +36,11 @@ exports.handler = async (event, context) => {
         if (!updatesResponse.data.ok) {
             return {
                 statusCode: 400,
+                headers: {
+                    'Access-Control-Allow-Origin': '*',
+                    'Access-Control-Allow-Methods': 'GET, POST',
+                    'Access-Control-Allow-Headers': 'Content-Type'
+                },
                 body: JSON.stringify({ success: false, error: `Error fetching messages: ${updatesResponse.data.description}` })
             };
         }
@@ -34,7 +49,7 @@ exports.handler = async (event, context) => {
         updatesResponse.data.result.forEach(update => {
             if (update.message) {
                 if (update.message.photo) {
-                    const photo = update.message.photo[update.message.photo.length - 1]; // Highest quality
+                    const photo = update.message.photo[update.message.photo.length - 1];
                     mediaItems.push({ type: 'photo', file_id: photo.file_id, name: `photo_${photo.file_id}.jpg` });
                 }
                 if (update.message.video) {
